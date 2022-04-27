@@ -24,7 +24,7 @@ from utils.common_config import get_train_dataset, get_train_transformations,\
 from utils.train_utils import train
 from utils.logger import Logger
 from utils.collate import collate_custom
-
+import wandb 
 
 # Parser
 parser = argparse.ArgumentParser(description='Main function')
@@ -40,7 +40,7 @@ parser.add_argument('--world-size', default=1, type=int,
                             help='number of nodes for distributed training')
 parser.add_argument('--rank', default=0, type=int,
                             help='node rank for distributed training')
-parser.add_argument('--dist-url', default='tcp://localhost:10001', type=str,
+parser.add_argument('--dist-url', default='tcp://localhost:12111', type=str,
                             help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str,
                             help='distributed backend')
@@ -91,6 +91,15 @@ def main_worker(gpu, ngpus_per_node, args):
 
     print('Python script is {}'.format(os.path.abspath(__file__)))
     print(colored(p, 'red'))
+    wandb.init(
+        name='test',
+        project="USS" + 'test',
+        entity="zangzelin",
+        mode="online",
+        save_code=True,
+        group=p['output_dir'],
+        config=args,
+    )
 
     # Get model
     print(colored('Retrieve model', 'blue'))
@@ -137,6 +146,8 @@ def main_worker(gpu, ngpus_per_node, args):
     print(colored('Train samples %d' %(len(train_dataset)), 'yellow'))
     print(colored(train_dataset, 'yellow'))
 
+    print('p[checkpoint]', p['checkpoint'])
+
     # Resume from checkpoint
     if os.path.exists(p['checkpoint']):
         print(colored('Restart from checkpoint {}'.format(p['checkpoint']), 'blue'))
@@ -166,9 +177,11 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # Train 
         print('Train ...')
-        eval_train = train(p, train_dataloader, model, 
-                                    optimizer, epoch, amp)
-
+        acc1 = train(p, train_dataloader, model, optimizer, epoch, amp)
+        wandb.log({
+                'top1_acc':acc1.avg,
+                'epoch':epoch,
+                })
         # Checkpoint
         if args.rank % ngpus_per_node == 0:
             print('Checkpoint ...')

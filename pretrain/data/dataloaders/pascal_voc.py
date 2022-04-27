@@ -96,7 +96,7 @@ class VOCSegmentation(data.Dataset):
     
     def _download(self):
         _fpath = os.path.join(Path.db_root_dir(), self.FILE)
-
+        print('root dir', _fpath)
         if os.path.isfile(_fpath):
             print('Files already downloaded')
             return

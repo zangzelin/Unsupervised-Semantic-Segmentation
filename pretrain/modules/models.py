@@ -24,6 +24,13 @@ class ContrastiveSegmentationModel(nn.Module):
             decoder[-1] = nn.Identity()
             self.decoder = decoder
 
+        if head == 'linear+': 
+            # Head is linear.
+            # We can just use regular decoder since final conv is 1 x 1.
+            self.head = decoder[-1]
+            decoder[-1] = nn.Identity()
+            self.decoder = decoder
+
         else:
             raise NotImplementedError('Head {} is currently not supported'.format(head))
 
@@ -45,11 +52,12 @@ class ContrastiveSegmentationModel(nn.Module):
         # Upsample to input resolution
         if self.upsample: 
             x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
+            embedding = F.interpolate(embedding, size=input_shape, mode='bilinear', align_corners=False)
             if self.use_classification_head:
                 sal = F.interpolate(sal, size=input_shape, mode='bilinear', align_corners=False)
 
         # Return outputs
         if self.use_classification_head:
-            return x, sal.squeeze()
+            return embedding, x, sal.squeeze()
         else:
             return x

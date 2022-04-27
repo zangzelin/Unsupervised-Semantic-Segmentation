@@ -5,7 +5,7 @@
 import torch
 from torch.nn.functional import cross_entropy
 from utils.utils import AverageMeter, ProgressMeter, freeze_layers
-
+import wandb
 
 def train(p, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
@@ -20,7 +20,8 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
     if p['freeze_layers']:
         model = freeze_layers(model)
-
+    
+    # acc1_list = []
     for i, batch in enumerate(train_loader):
         # Forward pass
         im_q = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
@@ -28,7 +29,9 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
 
-        logits, labels, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        # logits, labels, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        logits, labels, labels_matrix, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        # Q               P
 
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -36,8 +39,8 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         p_class_non_zero_classes = freq.float() / labels.numel()
         p_class[uniq] = p_class_non_zero_classes
         w_class = 1 / torch.log(1.02 + p_class)
-        contrastive_loss = cross_entropy(logits, labels, weight=w_class,
-                                            reduction='mean')
+        # contrastive_loss = cross_entropy(logits, labels, weight=w_class, reduction='mean')
+        contrastive_loss = -1* (labels_matrix * torch.log(logits+1e-5) + (1-labels_matrix) * torch.log(1-logits+1e-5)).mean()
 
         # Calculate total loss and update meters
         loss = contrastive_loss + saliency_loss
@@ -48,7 +51,6 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         acc1, acc5 = accuracy(logits, labels, topk=(1, 5))
         top1.update(acc1[0], im_q.size(0))
         top5.update(acc5[0], im_q.size(0))
-        
 
         # Update model
         optimizer.zero_grad()
@@ -62,6 +64,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # Display progress
         if i % 25 == 0:
             progress.display(i)
+    return top1
 
 
 @torch.no_grad()
@@ -73,6 +76,7 @@ def accuracy(output, target, topk=(1,)):
     correct = pred.eq(target.view(1, -1).expand_as(pred))
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+        # correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+        correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res

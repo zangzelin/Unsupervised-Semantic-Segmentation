@@ -1,0 +1,12 @@
+pretrain/data/dataloaders/__pycache__/
+check_point/
+*/__pycache__/*
+pretrain/wandb/*
+segmentation/data/util/__pycache__/*
+segmentation/models/__pycache__/*
+pretrain/utils/__pycache__/*
+segmentation/data/dataloaders/__pycache__/*
+segmentation/utils/__pycache__/*
+pretrain/modules/__pycache__/*
+pretrain/modules/moco/__pycache__/*
+pretrain/data/util/__pycache__/*
